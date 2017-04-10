@@ -17,9 +17,12 @@ import com.orbotix.common.RobotChangedStateListener;
 import com.orbotix.le.DiscoveryAgentLE;
 import com.orbotix.le.RobotLE;
 import com.orbotix.le.RobotRadioDescriptor;
+import com.orbotix.le.connectstrategy.ConnectStrategy;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Hello World Sample
@@ -30,9 +33,11 @@ import java.util.List;
  */
 
 public class MainActivity extends Activity implements RobotChangedStateListener, DiscoveryAgentEventListener {
+    private final String TAG = this.getClass().getSimpleName();
 
-    private ConvenienceRobot mRobot;
-    private DiscoveryAgentLE mDiscoveryAgent;
+    //private ConvenienceRobot mRobot;
+
+    private Map<String, ConvenienceRobot> mRobotMap = new HashMap<String, ConvenienceRobot>();
 
     private static final int REQUEST_CODE_LOCATION_PERMISSION = 42;
 
@@ -47,17 +52,17 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
             DiscoveryAgentClassic checks only for Bluetooth Classic robots.
             DiscoveryAgentLE checks only for Bluetooth LE robots.
        */
-        DualStackDiscoveryAgent.getInstance().addRobotStateListener( this );
+//        DualStackDiscoveryAgent.getInstance().addRobotStateListener( this );
 
         if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ) {
             int hasLocationPermission = checkSelfPermission( Manifest.permission.ACCESS_COARSE_LOCATION );
             if( hasLocationPermission != PackageManager.PERMISSION_GRANTED ) {
-                Log.e( "Sphero", "Location permission has not already been granted" );
+                Log.e( TAG, "Location permission has not already been granted" );
                 List<String> permissions = new ArrayList<String>();
                 permissions.add( Manifest.permission.ACCESS_COARSE_LOCATION);
                 requestPermissions(permissions.toArray(new String[permissions.size()] ), REQUEST_CODE_LOCATION_PERMISSION );
             } else {
-                Log.d( "Sphero", "Location permission already granted" );
+                Log.d( TAG, "Location permission already granted" );
             }
         }
     }
@@ -83,20 +88,20 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
     }
 
     //Turn the robot LED on or off every two seconds
-    private void blink( final boolean lit ) {
-        if( mRobot == null )
+    private void blink(final ConvenienceRobot convenienceRobot, final boolean lit ) {
+        if( convenienceRobot == null )
             return;
 
         if( lit ) {
-            mRobot.setLed( 0.0f, 0.0f, 0.0f );
+            convenienceRobot.setLed( 0.0f, 0.0f, 0.0f );
         } else {
-            mRobot.setLed( 0.0f, 0.0f, 1.0f );
+            convenienceRobot.setLed( 0.0f, 0.0f, 1.0f );
         }
 
         final Handler handler = new Handler();
         handler.postDelayed(new Runnable() {
             public void run() {
-                blink(!lit);
+                blink(convenienceRobot, !lit);
             }
         }, 2000);
     }
@@ -118,39 +123,46 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
             try {
                 DualStackDiscoveryAgent.getInstance().startDiscovery(getApplicationContext());
             } catch (DiscoveryException e) {
-                Log.e("Sphero", "DiscoveryException: " + e.getMessage());
+                Log.e(TAG, "DiscoveryException: " + e.getMessage());
             }
         }
 */
-        if(mDiscoveryAgent == null){
-            mDiscoveryAgent = DiscoveryAgentLE.getInstance();
-            mDiscoveryAgent.addDiscoveryListener(this);
-            mDiscoveryAgent.addRobotStateListener(this);
+        DiscoveryAgentLE.getInstance().setMaxConnectedRobots(10);
+        DiscoveryAgentLE.getInstance().addDiscoveryListener(this);
+        DiscoveryAgentLE.getInstance().addRobotStateListener(this);
 
-            RobotRadioDescriptor robotRadioDescriptor = new RobotRadioDescriptor();
-            robotRadioDescriptor.setNamePrefixes(new String[]{"BB-"});
-            mDiscoveryAgent.setRadioDescriptor(robotRadioDescriptor);
+        RobotRadioDescriptor robotRadioDescriptor = new RobotRadioDescriptor();
+        robotRadioDescriptor.setNamePrefixes(new String[]{"BB-"});
+        DiscoveryAgentLE.getInstance().setRadioDescriptor(robotRadioDescriptor);
 
-            try {
-                mDiscoveryAgent.startDiscovery(this);
-            } catch (DiscoveryException e) {
-                Log.e("Sphero", "Discovery Error: " + e);
-                e.printStackTrace();
-            }
+        try {
+            DiscoveryAgentLE.getInstance().startDiscovery(this);
+        } catch (DiscoveryException e) {
+            Log.e(TAG, "Discovery Error: " + e);
+            e.printStackTrace();
         }
     }
 
     @Override
     protected void onStop() {
         //If the DiscoveryAgent is in discovery mode, stop it.
-        if( DualStackDiscoveryAgent.getInstance().isDiscovering() ) {
-            DualStackDiscoveryAgent.getInstance().stopDiscovery();
+//        if( DualStackDiscoveryAgent.getInstance().isDiscovering() ) {
+//            DualStackDiscoveryAgent.getInstance().stopDiscovery();
+//        }
+
+        if( DiscoveryAgentLE.getInstance().isDiscovering() ) {
+            DiscoveryAgentLE.getInstance().stopDiscovery();
         }
 
         //If a robot is connected to the device, disconnect it
-        if( mRobot != null ) {
-            mRobot.disconnect();
-            mRobot = null;
+//        if( mRobot != null ) {
+//            mRobot.disconnect();
+//            mRobot = null;
+//        }
+
+        for(ConvenienceRobot convenienceRobot : mRobotMap.values()){
+            convenienceRobot.disconnect();
+            mRobotMap.remove(convenienceRobot);
         }
 
         super.onStop();
@@ -159,7 +171,8 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        DualStackDiscoveryAgent.getInstance().addRobotStateListener(null);
+//        DualStackDiscoveryAgent.getInstance().addRobotStateListener(null);
+        DiscoveryAgentLE.getInstance().addRobotStateListener(null);
     }
 
     @Override
@@ -183,7 +196,7 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
         }
 */
             case Online:
-                Log.i("Sphero", "Robot " + robot.getName() + " Online!");
+                Log.i(TAG, "Robot " + robot.getName() + " Online!");
                 //If robot uses Bluetooth LE, Developer Mode can be turned on.
                 //This turns off DOS protection. This generally isn't required.
                 if (robot instanceof RobotLE) {
@@ -191,16 +204,19 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
                 }
 
                 //Save the robot as a ConvenienceRobot for additional utility methods
-                mRobot = new ConvenienceRobot(robot);
+                ConvenienceRobot convenienceRobot = new ConvenienceRobot(robot);
+                if(!mRobotMap.containsKey(convenienceRobot.getRobot().getName())){
+                    mRobotMap.put(convenienceRobot.getRobot().getName(), convenienceRobot);
+                }
 
                 //Start blinking the robot's LED
-                blink(false);
+                blink(convenienceRobot, false);
                 break;
             case Connecting:
-                Log.i("Sphero", "Robot " + robot.getName() + " Connecting!");
+                Log.i(TAG, "Robot " + robot.getName() + " Connecting!");
                 break;
             case Connected:
-                Log.i("Sphero", "Robot " + robot.getName() + " Connected!");
+                Log.i(TAG, "Robot " + robot.getName() + " Connected!");
                 break;
             // Handle other cases
         }
@@ -208,10 +224,11 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
 
     @Override
     public void handleRobotsAvailable(List<Robot> robots) {
-        Log.i("Sphero", "Found " + robots.size() + " robots");
+        Log.i(TAG, "Found " + robots.size() + " robots");
 
         for (Robot robot : robots) {
-            Log.i("Sphero", "  " + robot.getName());
+            Log.i(TAG, " " + robot.getName());
+            //Log.i(TAG, " " + robot.getAddress());
         }
     }
 
