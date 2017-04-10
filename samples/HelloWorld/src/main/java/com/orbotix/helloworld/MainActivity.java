@@ -10,10 +10,13 @@ import android.util.Log;
 
 import com.orbotix.ConvenienceRobot;
 import com.orbotix.DualStackDiscoveryAgent;
+import com.orbotix.common.DiscoveryAgentEventListener;
 import com.orbotix.common.DiscoveryException;
 import com.orbotix.common.Robot;
 import com.orbotix.common.RobotChangedStateListener;
+import com.orbotix.le.DiscoveryAgentLE;
 import com.orbotix.le.RobotLE;
+import com.orbotix.le.RobotRadioDescriptor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,9 +29,10 @@ import java.util.List;
  * This example also covers turning on Developer Mode for LE robots.
  */
 
-public class MainActivity extends Activity implements RobotChangedStateListener {
+public class MainActivity extends Activity implements RobotChangedStateListener, DiscoveryAgentEventListener {
 
     private ConvenienceRobot mRobot;
+    private DiscoveryAgentLE mDiscoveryAgent;
 
     private static final int REQUEST_CODE_LOCATION_PERMISSION = 42;
 
@@ -108,12 +112,30 @@ public class MainActivity extends Activity implements RobotChangedStateListener 
     }
 
     private void startDiscovery() {
+/*
         //If the DiscoveryAgent is not already looking for robots, start discovery.
         if( !DualStackDiscoveryAgent.getInstance().isDiscovering() ) {
             try {
                 DualStackDiscoveryAgent.getInstance().startDiscovery(getApplicationContext());
             } catch (DiscoveryException e) {
                 Log.e("Sphero", "DiscoveryException: " + e.getMessage());
+            }
+        }
+*/
+        if(mDiscoveryAgent == null){
+            mDiscoveryAgent = DiscoveryAgentLE.getInstance();
+            mDiscoveryAgent.addDiscoveryListener(this);
+            mDiscoveryAgent.addRobotStateListener(this);
+
+            RobotRadioDescriptor robotRadioDescriptor = new RobotRadioDescriptor();
+            robotRadioDescriptor.setNamePrefixes(new String[]{"BB-"});
+            mDiscoveryAgent.setRadioDescriptor(robotRadioDescriptor);
+
+            try {
+                mDiscoveryAgent.startDiscovery(this);
+            } catch (DiscoveryException e) {
+                Log.e("Sphero", "Discovery Error: " + e);
+                e.printStackTrace();
             }
         }
     }
@@ -142,9 +164,9 @@ public class MainActivity extends Activity implements RobotChangedStateListener 
 
     @Override
     public void handleRobotChangedState( Robot robot, RobotChangedStateNotificationType type ) {
-        switch( type ) {
+        switch (type) {
+/*
             case Online: {
-
                 //If robot uses Bluetooth LE, Developer Mode can be turned on.
                 //This turns off DOS protection. This generally isn't required.
                 if( robot instanceof RobotLE) {
@@ -159,5 +181,40 @@ public class MainActivity extends Activity implements RobotChangedStateListener 
                 break;
             }
         }
+*/
+            case Online:
+                Log.i("Sphero", "Robot " + robot.getName() + " Online!");
+                //If robot uses Bluetooth LE, Developer Mode can be turned on.
+                //This turns off DOS protection. This generally isn't required.
+                if (robot instanceof RobotLE) {
+                    ((RobotLE) robot).setDeveloperMode(true);
+                }
+
+                //Save the robot as a ConvenienceRobot for additional utility methods
+                mRobot = new ConvenienceRobot(robot);
+
+                //Start blinking the robot's LED
+                blink(false);
+                break;
+            case Connecting:
+                Log.i("Sphero", "Robot " + robot.getName() + " Connecting!");
+                break;
+            case Connected:
+                Log.i("Sphero", "Robot " + robot.getName() + " Connected!");
+                break;
+            // Handle other cases
+        }
     }
+
+    @Override
+    public void handleRobotsAvailable(List<Robot> robots) {
+        Log.i("Sphero", "Found " + robots.size() + " robots");
+
+        for (Robot robot : robots) {
+            Log.i("Sphero", "  " + robot.getName());
+        }
+    }
+
+
+
 }
