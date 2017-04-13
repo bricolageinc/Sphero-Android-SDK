@@ -33,13 +33,11 @@ import java.util.Map;
  */
 
 public class MainActivity extends Activity implements RobotChangedStateListener, DiscoveryAgentEventListener {
-    private final String TAG = this.getClass().getSimpleName();
-
-    //private ConvenienceRobot mRobot;
-
-    private Map<String, ConvenienceRobot> mRobotMap = new HashMap<String, ConvenienceRobot>();
+    private static final String TAG = MainActivity.class.getSimpleName();
 
     private static final int REQUEST_CODE_LOCATION_PERMISSION = 42;
+
+    private Map<String, ConvenienceRobot> mRobotMap = new HashMap<String, ConvenienceRobot>();
 
     @Override
     protected void onCreate( Bundle savedInstanceState ) {
@@ -52,7 +50,7 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
             DiscoveryAgentClassic checks only for Bluetooth Classic robots.
             DiscoveryAgentLE checks only for Bluetooth LE robots.
        */
-//        DualStackDiscoveryAgent.getInstance().addRobotStateListener( this );
+        //DualStackDiscoveryAgent.getInstance().addRobotStateListener( this );
 
         if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ) {
             int hasLocationPermission = checkSelfPermission( Manifest.permission.ACCESS_COARSE_LOCATION );
@@ -88,20 +86,20 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
     }
 
     //Turn the robot LED on or off every two seconds
-    private void blink(final ConvenienceRobot convenienceRobot, final boolean lit ) {
-        if( convenienceRobot == null )
+    private void blink(final ConvenienceRobot cRobot, final boolean lit ) {
+        if( cRobot == null )
             return;
 
         if( lit ) {
-            convenienceRobot.setLed( 0.0f, 0.0f, 0.0f );
+            cRobot.setLed( 0.0f, 0.0f, 0.0f );
         } else {
-            convenienceRobot.setLed( 0.0f, 0.0f, 1.0f );
+            cRobot.setLed( 0.0f, 0.0f, 1.0f );
         }
 
         final Handler handler = new Handler();
         handler.postDelayed(new Runnable() {
             public void run() {
-                blink(convenienceRobot, !lit);
+                blink(cRobot, !lit);
             }
         }, 2000);
     }
@@ -129,7 +127,7 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
 */
         DiscoveryAgentLE.getInstance().setMaxConnectedRobots(10);
         DiscoveryAgentLE.getInstance().addDiscoveryListener(this);
-        DiscoveryAgentLE.getInstance().addRobotStateListener(this);
+        DiscoveryAgentLE.getInstance().addRobotStateListener(this); //TODO: ここを変更する必要がある
 
         RobotRadioDescriptor robotRadioDescriptor = new RobotRadioDescriptor();
         robotRadioDescriptor.setNamePrefixes(new String[]{"BB-"});
@@ -149,8 +147,7 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
 //        if( DualStackDiscoveryAgent.getInstance().isDiscovering() ) {
 //            DualStackDiscoveryAgent.getInstance().stopDiscovery();
 //        }
-
-        if( DiscoveryAgentLE.getInstance().isDiscovering() ) {
+        if(DiscoveryAgentLE.getInstance().isDiscovering()){
             DiscoveryAgentLE.getInstance().stopDiscovery();
         }
 
@@ -160,10 +157,10 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
 //            mRobot = null;
 //        }
 
-        for(ConvenienceRobot convenienceRobot : mRobotMap.values()){
-            convenienceRobot.disconnect();
-            mRobotMap.remove(convenienceRobot);
+        for(ConvenienceRobot cRobot : mRobotMap.values()){
+            cRobot.disconnect();
         }
+        mRobotMap.clear();
 
         super.onStop();
     }
@@ -204,13 +201,14 @@ public class MainActivity extends Activity implements RobotChangedStateListener,
                 }
 
                 //Save the robot as a ConvenienceRobot for additional utility methods
-                ConvenienceRobot convenienceRobot = new ConvenienceRobot(robot);
-                if(!mRobotMap.containsKey(convenienceRobot.getRobot().getName())){
-                    mRobotMap.put(convenienceRobot.getRobot().getName(), convenienceRobot);
+                ConvenienceRobot cRobot = new ConvenienceRobot(robot);
+
+                if(!mRobotMap.containsKey(robot.getName())){
+                    mRobotMap.put(robot.getName(), cRobot);
                 }
 
                 //Start blinking the robot's LED
-                blink(convenienceRobot, false);
+                blink(cRobot, false);
                 break;
             case Connecting:
                 Log.i(TAG, "Robot " + robot.getName() + " Connecting!");
